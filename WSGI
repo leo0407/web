@@ -1,0 +1,86 @@
+WSGI是什么
+WSGI(Web Server Gateway Interface)是一种规范
+参见PEP 333 http://www.python.org/dev/peps/pep-0333/
+
+WSGI Server有哪些
+比如 Django、CherryPy 都自带 WSGI server 主要是测试用途, 发布时则使用生产环境的 WSGI server
+而有些 WSGI 下的框架比如 pylons、bfg 等, 自己不实现 WSGI server。使用 paste 作为 WSGI server
+CherryPy's WSGI server. 
+Python自带的 wsgiref
+
+WSGI application
+
+一个接口与两个参数
+application(environ, start_response)
+
+Demo
+[python]
+    #! /usr/bin/env python  
+
+    # Our tutorial's WSGI server  
+    from wsgiref.simple_server import make_server  
+
+    def application(environ, start_response):  
+
+       # Sorting and stringifying the environment key, value pairs  
+       response_body = ['%s: %s' % (key, value)  
+                        for key, value in sorted(environ.items())]  
+       response_body = '\n'.join(response_body)  
+
+       status = '200 OK'  
+       response_headers = [('Content-Type', 'text/plain'),  
+                      ('Content-Length', str(len(response_body)))]  
+       start_response(status, response_headers)  
+
+       return [response_body]  
+
+    # Instantiate the WSGI server.  
+    # It will receive the request, pass it to the application  
+    # and send the application's response to the client  
+    httpd = make_server(  
+       'localhost', # The host name.  
+       8051, # A port number where to wait for the request.  
+       application # Our application object name, in this case a function.  
+       )  
+
+    httpd.serve_forever()  
+
+wsgiref的simple_serve说明
+server的主要作用是接受client的请求，并把的收到的请求交给RequestHandlerClass处理，
+RequestHandlerClass处理完成后回传结果给client
+
+WSGIServerk继承关系
+WSGIServer-->HTTPServer-->SocketServer.TCPServer-->BaseServer
+主要处理流程
+serve_forever
+  _handle_request_noblock()
+    process_request
+      finish_request--> RequestHandlerClass()
+      close_request
+
+serve_forever循环接受client請求， 如果有请求来， 
+经finish_request方法把请求交給RequestHandlerClass处理，
+RequestHandlerClass调用handle()方法处理request，
+WSGIRequestHandler的handle()方法把request又交给ServerHandler处理，
+ServerHandler调用run执行application方法， 回传网页的结果(含http header及网页内容)给client
+
+WSGIRequestHandler继承关系
+WSGIRequestHandler-->BaseHTTPRequestHandler-->StreamRequestHandler-->BaseRequestHandler
+
+BaseRequestHandler主要方法及处理流程
+1、setup()
+2、handle()
+3、finish()
+
+WSGIRequestHandler主要方法及处理流程
+1、get_environ 增加env
+2、handle (override)
+        handler = ServerHandler
+        handler.run(self.server.get_app())
+
+ServerHandler继承关系
+ServerHandler-->SimpleHandler-->BaseHandler
+run方法
+  setup_environ
+  self.result = application(self.environ, self.start_response)
+  self.finish_response
